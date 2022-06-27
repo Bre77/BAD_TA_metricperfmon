@@ -108,19 +108,28 @@ else:
 
         data_element = orig_event.find('data')
         data_lines = data_element.text.split('\n')
-        # Get Headers
+        
         fields = False
         for line in data_lines:
             if line.startswith("instance"):
+                # Get fields from header
                 fields = line.rstrip('\t').split('\t')
                 for x in range(1,len(fields)):
                     fields[x] = "metric_name:"+fields[x]
                 continue
             if not fields:
                 continue
+            # Have fields, get values
             values = line.rstrip('\t').split('\t')
             raw = {}
             for field,value in zip(fields,values):
+                if field != "instance":
+                    if "e" in value: # Cannot handle this format
+                        pass
+                    value = float(value)
+                    # Remove decimals if all zeros
+                    if value % 1 == 0:
+                        value = int(value)
                 raw[field] = value
             data_element.text = json.dumps(raw,separators=(',', ':'))
             print(tostring(orig_event).decode())
