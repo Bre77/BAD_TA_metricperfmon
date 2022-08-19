@@ -93,43 +93,52 @@ else:
         raise("SPLUNK_HOME not set")
     process = subprocess.Popen(os.environ['SPLUNK_HOME']+"/bin/splunk-perfmon.exe", stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=sys.stdin, text=True)
 
-    if process.stdout.readline().rstrip('\n') == "<stream>":
-        print("<stream>")
+    
 
     while True:
-        xml = ""
-        while True:
-            line = process.stdout.readline()
-            xml += line
-            if line.startswith("</event>"):
-                break
-        orig_event = fromstring(xml)
-        orig_event.attrib['stanza'] = "metric"+orig_event.attrib['stanza']
+        line = process.stdout.readline()
+        if line.startswith("<event"):
+            xml = ""
+            while True:
+                xml += line
+                if line.startswith("</event>"):
+                    break
+                line = process.stdout.readline()
+            orig_event = fromstring(xml)
+            orig_event.attrib['stanza'] = "metric"+orig_event.attrib['stanza']
 
-        data_element = orig_event.find('data')
-        data_lines = data_element.text.split('\n')
-        
-        fields = False
-        for line in data_lines:
-            if line.startswith("instance"):
-                # Get fields from header
-                fields = line.rstrip('\t').split('\t')
-                for x in range(1,len(fields)):
-                    fields[x] = "metric_name:"+fields[x]
-                continue
-            if not fields:
-                continue
-            # Have fields, get values
-            values = line.rstrip('\t').split('\t')
-            raw = {}
-            for field,value in zip(fields,values):
-                if field != "instance":
-                    if "e" in value: # Cannot handle this format
-                        pass
-                    value = float(value)
-                    # Remove decimals if all zeros
-                    if value % 1 == 0:
-                        value = int(value)
-                raw[field] = value
-            data_element.text = json.dumps(raw,separators=(',', ':'))
-            print(tostring(orig_event).decode())
+            data_element = orig_event.find('data')
+            data_lines = data_element.text.split('\n')
+            
+            fields = False
+            prefix = False
+            for line in data_lines:
+                if line.startswith("object"):
+                    prefix = line[7:]
+                if line.startswith("instance"):
+                    # Get fields from header
+                    fields = line.rstrip('\t').split('\t')
+                    for x in range(1,len(fields)):
+                        fields[x] = f"metric_name:{prefix}.{fields[x]}"
+                    continue
+                if not fields:
+                    continue
+                # Have fields, get values
+                values = line.rstrip('\t').split('\t')
+                data = {}
+                for field,value in zip(fields,values):
+                    if field != "instance":
+                        if "e" in value: # Cannot handle this format
+                            pass
+                        value = float(value)
+                        # Remove decimals if all zeros
+                        if value % 1 == 0:
+                            value = int(value)
+                    data[field] = value
+                data_element.text = json.dumps(data,separators=(',', ':'))
+                print(tostring(orig_event).decode())
+        elif line.startswith("<stream>"):
+            print("<stream>")
+        elif line.startswith("</stream>"):
+            print("</stream>")
+            exit()

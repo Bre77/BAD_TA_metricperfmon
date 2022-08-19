@@ -1,2 +1,2 @@
 pip install pyinstaller
-pyinstaller --onefile --distpath .\bin --workpath %temp% .\bin\src\metricperfmon.py
+pyinstaller --onefile --distpath .\bin --icon .\bin\src\appIcon.ico --workpath %temp% .\bin\src\metricperfmon.py
